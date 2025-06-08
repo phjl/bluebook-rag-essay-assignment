@@ -1,51 +1,118 @@
-import { DeployButton } from "@/components/deploy-button";
-import { EnvVarWarning } from "@/components/env-var-warning";
-import { AuthButton } from "@/components/auth-button";
-import { Hero } from "@/components/hero";
-import { ThemeSwitcher } from "@/components/theme-switcher";
-import { ConnectSupabaseSteps } from "@/components/tutorial/connect-supabase-steps";
-import { SignUpUserSteps } from "@/components/tutorial/sign-up-user-steps";
-import { hasEnvVars } from "@/lib/utils";
-import Link from "next/link";
+'use client';
+
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import ReactMarkdown from 'react-markdown'
 
 export default function Home() {
-  return (
-    <main className="min-h-screen flex flex-col items-center">
-      <div className="flex-1 w-full flex flex-col gap-20 items-center">
-        <nav className="w-full flex justify-center border-b border-b-foreground/10 h-16">
-          <div className="w-full max-w-5xl flex justify-between items-center p-3 px-5 text-sm">
-            <div className="flex gap-5 items-center font-semibold">
-              <Link href={"/"}>Next.js Supabase Starter</Link>
-              <div className="flex items-center gap-2">
-                <DeployButton />
-              </div>
-            </div>
-            {!hasEnvVars ? <EnvVarWarning /> : <AuthButton />}
-          </div>
-        </nav>
-        <div className="flex-1 flex flex-col gap-20 max-w-5xl p-5">
-          <Hero />
-          <main className="flex-1 flex flex-col gap-6 px-4">
-            <h2 className="font-medium text-xl mb-4">Next steps</h2>
-            {hasEnvVars ? <SignUpUserSteps /> : <ConnectSupabaseSteps />}
-          </main>
-        </div>
+  const [question, setQuestion] = useState('');
+  const [answer, setAnswer] = useState('');
+  const [loadingAsk, setLoadingAsk] = useState(false);
+  const [loadingSummarize, setLoadingSummarize] = useState(false);
 
-        <footer className="w-full flex items-center justify-center border-t mx-auto text-center text-xs gap-8 py-16">
-          <p>
-            Powered by{" "}
-            <a
-              href="https://supabase.com/?utm_source=create-next-app&utm_medium=template&utm_term=nextjs"
-              target="_blank"
-              className="font-bold hover:underline"
-              rel="noreferrer"
-            >
-              Supabase
-            </a>
-          </p>
-          <ThemeSwitcher />
-        </footer>
-      </div>
-    </main>
+  async function handleAsk(e: React.FormEvent) {
+    e.preventDefault()
+    setLoadingAsk(true);
+    setAnswer('');
+
+    await fetch('http://localhost:3000/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+        stream: true,
+        messages: [
+            { role: 'user', content: question }
+        ]
+        })
+    }).then(
+      handleResponseStream
+    ).catch(
+      handleError
+    ).finally(
+      () => {
+        setLoadingAsk(false);
+        setQuestion('');    
+      }
+    )    
+  }
+
+  function handleError(error:Error){
+      console.log(error)
+  }
+  
+  async function handleResponseStream(response:Response) {
+    if(!response.body){
+      setAnswer("No response")
+      return
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let done = false
+    let aiResponse = ''
+
+    while (!done) {
+        const { value, done: streamDone } = await reader.read()
+        done = streamDone
+        if(value){
+            const chunk = decoder.decode(value)
+            aiResponse += chunk
+            setAnswer(aiResponse)
+        }
+    }
+  }
+
+  async function handleSummarize(){
+    setLoadingSummarize(true);
+    setAnswer('');
+
+    await fetch('http://localhost:3000/api/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: question
+        })
+    }).then(
+      async response => {
+        const summary = await response.text()
+        setAnswer(summary)
+      }
+    ).catch(
+      handleError
+    ).finally(
+      () => {
+        setLoadingSummarize(false);
+        setQuestion('');    
+      }
+    )    
+  }
+  function isLoading(): boolean {
+    return loadingAsk || loadingSummarize;
+  }
+
+  return (
+    <form onSubmit={handleAsk}>
+        <div className="max-w-3xl mx-auto mt-10 space-y-4 px-4">
+            <Input
+                placeholder="Ask a question about Paul Graham's essays or suggest an essay to summarize"
+                value={question}
+                disabled={isLoading()}
+                onChange={e => setQuestion(e.target.value)}
+            />
+            <div className="space-x-4">
+              <Button type="submit" disabled={isLoading() || question.length < 1}>
+                  {loadingAsk ? 'Thinking...' : 'Ask'}
+              </Button>
+              <Button onClick={handleSummarize} disabled={isLoading() || question.length < 1}>
+                  {loadingSummarize ? 'Thinking...' : 'Generate summary'}
+              </Button>
+            </div>
+            <ReactMarkdown>
+                {answer}
+            </ReactMarkdown>
+        </div>
+    </form>
   );
+  
 }

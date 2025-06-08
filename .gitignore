@@ -40,3 +40,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# vscode
+.vscode
+
+# venv
+.venv
+
+# deepeval
+.deepeval
+__pycache__

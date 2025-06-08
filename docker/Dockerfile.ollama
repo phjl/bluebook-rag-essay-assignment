@@ -1,0 +1,11 @@
+FROM ollama/ollama:latest
+
+# Install curl for use in health checks
+RUN apt-get update && apt-get install -y \
+    curl
+# Preinstall models in image
+RUN ollama serve \
+    & sleep 5 \ 
+    && ollama pull gemma3:1b \
+    && ollama pull all-minilm:22m \
+    && pkill ollama
