@@ -20,6 +20,7 @@ Thus I haven't bothered refining or optimizing this at all.
 npx supabase start
 
 # Create & populate .env.local
+cp .env.example .env.local
 npx supabase status -o env \
   --override-name api.url=NEXT_PUBLIC_SUPABASE_URL \
   --override-name auth.anon_key=NEXT_PUBLIC_SUPABASE_ANON_KEY |
@@ -47,7 +48,7 @@ I used it to generate eval questions and golden answers which are located in `/t
 
 ```bash
 # Set up deepeval
-pip install deepeval
+pip install -r requirements.txt
 deepeval set-ollama gemma3:1b --base-url="http://localhost:11434"
 
 # Run eval tests
